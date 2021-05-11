@@ -96,9 +96,11 @@
     </PostBuildEvent>
   </ItemDefinitionGroup>
   <ItemGroup>
+    <ClInclude Include="include\ini.h" />
     <ClInclude Include="include\plugin.h" />
   </ItemGroup>
   <ItemGroup>
+    <ClCompile Include="src\ini.cpp" />
     <ClCompile Include="src\plugin.cpp" />
   </ItemGroup>
   <ItemGroup>

@@ -8,6 +8,7 @@
 #include "doticu_skylib/ui.h"
 #include "doticu_skylib/version.h"
 
+#include "ini.h"
 #include "plugin.h"
 
 namespace doticu_skylib { namespace fix_blank_names {
@@ -38,7 +39,13 @@ namespace doticu_skylib { namespace fix_blank_names {
         std::thread(
             []()->void
             {
-                SKYLIB_LOG("Running. Every reference in the loaded grid will be checked every five seconds.");
+                SKYLIB_LOG("doticu_fix_blank_names:");
+                SKYLIB_LOG("Each reference around the player will be checked every %llu seconds.", ini.fix_interval_in_seconds);
+                if (ini.blank_name_algorithm == 0) {
+                    SKYLIB_LOG("Using the loose algorithm. Names with no characters or just whitespace are considered blank.");
+                } else {
+                    SKYLIB_LOG("Using the strict algorithm. Only names with no characters are considered blank.");
+                }
 
                 Player_t& player = *Player_t::Self();
                 UI_t& ui = UI_t::Self();
@@ -50,13 +57,19 @@ namespace doticu_skylib { namespace fix_blank_names {
                             time = ui.game_timer.total_time;
                             if (player.Is_Attached()) {
                                 Vector_t<some<Reference_t*>> grid = Reference_t::Grid_References();
-                                for (size_t idx = 0, end = grid.size(); idx < end; idx += 1) {
-                                    grid[idx]->Remove_Blank_Name();
+                                if (ini.blank_name_algorithm == 0) {
+                                    for (size_t idx = 0, end = grid.size(); idx < end; idx += 1) {
+                                        grid[idx]->Remove_Blank_Name(true);
+                                    }
+                                } else {
+                                    for (size_t idx = 0, end = grid.size(); idx < end; idx += 1) {
+                                        grid[idx]->Remove_Blank_Name(false);
+                                    }
                                 }
                             }
                         }
                     }
-                    std::this_thread::sleep_for(std::chrono::seconds(5));
+                    std::this_thread::sleep_for(std::chrono::seconds(ini.fix_interval_in_seconds));
                 }
             }
         ).detach();
