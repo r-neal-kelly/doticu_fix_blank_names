@@ -11,8 +11,10 @@ namespace doticu_skylib { namespace fix_blank_names {
     class INI_t
     {
     public:
-        u64 fix_interval_in_seconds;
-        u64 blank_name_algorithm;
+        u64     update_interval_in_seconds;
+        u64     remove_blank_name_algorithm;
+        Bool_t  only_remove_blank_names_on_load_game;
+        Bool_t  only_prevent_blank_names;
 
     public:
         INI_t();
