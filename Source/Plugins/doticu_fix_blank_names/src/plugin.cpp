@@ -2,9 +2,6 @@
     Copyright © 2020 r-neal-kelly, aka doticu
 */
 
-#include <thread>
-#include <unordered_set>
-
 #include "doticu_skylib/alias_base.h"
 #include "doticu_skylib/alias_reference.h"
 #include "doticu_skylib/extra_text_display.h"
@@ -19,28 +16,12 @@
 
 namespace doticu_skylib { namespace fix_blank_names {
 
-    std::mutex Plugin_t::lock;
-
     Plugin_t::Plugin_t() :
         SKSE_Plugin_t("doticu_fix_blank_names",
                       Version_t<u16>(1, 5, 97),
                       Operator_e::EQUAL_TO,
                       Version_t<u16>(2, 0, 17),
-                      Operator_e::GREATER_THAN_OR_EQUAL_TO),
-        locker(Plugin_t::lock)
-    {
-    }
-
-    Plugin_t::~Plugin_t()
-    {
-    }
-
-    Bool_t Plugin_t::On_Register(some<Virtual::Machine_t*> machine)
-    {
-        return true;
-    }
-
-    void Plugin_t::On_After_Load_Data(Start_Updating_f start_updating_f)
+                      Operator_e::GREATER_THAN_OR_EQUAL_TO)
     {
         SKYLIB_LOG("doticu_fix_blank_names:");
         SKYLIB_LOG("- Update interval has been set to %llu seconds.", ini.update_interval_in_seconds);
@@ -59,30 +40,15 @@ namespace doticu_skylib { namespace fix_blank_names {
             }
         }
         SKYLIB_LOG("");
+    }
 
-        std::thread(
-            []()->void
-            {
-                Player_t& player = *Player_t::Self();
-                UI_t& ui = UI_t::Self();
-                u32 time = 0;
-                while (true) {
-                    {
-                        std::lock_guard<std::mutex> locker(Plugin_t::lock);
-                        if (time != ui.game_timer.total_time) {
-                            time = ui.game_timer.total_time;
-                            if (player.Is_Attached()) {
-                                plugin.Prevent();
-                                if (!ini.only_remove_blank_names_on_load_game) {
-                                    plugin.Remove_Grid();
-                                }
-                            }
-                        }
-                    }
-                    std::this_thread::sleep_for(std::chrono::seconds(ini.update_interval_in_seconds));
-                }
-            }
-        ).detach();
+    Plugin_t::~Plugin_t()
+    {
+    }
+
+    void Plugin_t::On_After_Load_Data()
+    {
+        Start_Updating(std::chrono::milliseconds(ini.update_interval_in_seconds * 1000));
     }
 
     void Plugin_t::On_After_New_Game()
@@ -91,23 +57,14 @@ namespace doticu_skylib { namespace fix_blank_names {
 
     void Plugin_t::On_Before_Save_Game()
     {
-        if (!this->locker.owns_lock()) {
-            this->locker.lock();
-        }
     }
 
     void Plugin_t::On_After_Save_Game()
     {
-        if (this->locker.owns_lock()) {
-            this->locker.unlock();
-        }
     }
 
     void Plugin_t::On_Before_Load_Game(some<const char*> file_path, u32 file_path_length)
     {
-        if (!this->locker.owns_lock()) {
-            this->locker.lock();
-        }
     }
 
     void Plugin_t::On_After_Load_Game(Bool_t did_load_successfully)
@@ -115,18 +72,18 @@ namespace doticu_skylib { namespace fix_blank_names {
         if (ini.only_remove_blank_names_on_load_game) {
             Remove_All();
         }
-
-        if (this->locker.owns_lock()) {
-            this->locker.unlock();
-        }
     }
 
     void Plugin_t::On_Before_Delete_Game(some<const char*> file_path, u32 file_path_length)
     {
     }
 
-    void Plugin_t::On_Update()
+    void Plugin_t::On_Update(u32 time_stamp)
     {
+        Prevent();
+        if (!ini.only_remove_blank_names_on_load_game) {
+            Remove_Grid();
+        }
     }
 
     static void Test(some<Alias_Reference_t*> alias, some<Reference_t*> reference, some<Extra_Text_Display_t*> x_text_display)
@@ -208,7 +165,8 @@ namespace doticu_skylib { namespace fix_blank_names {
                         {
                             if (reference) {
                                 Write_Locker_t locker(reference->x_list.lock);
-                                maybe<Extra_Text_Display_t*> x_text_display = reference->x_list.Get<Extra_Text_Display_t>(locker);
+                                maybe<Extra_Text_Display_t*> x_text_display =
+                                    reference->x_list.Get<Extra_Text_Display_t>(locker);
                                 if (x_text_display) {
                                     if (!x_text_display->owning_quest) {
                                         x_text_display->owning_quest = this->quest;
