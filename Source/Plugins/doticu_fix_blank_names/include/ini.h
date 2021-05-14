@@ -15,7 +15,7 @@ namespace doticu_skylib { namespace fix_blank_names {
         static constexpr u64    MIN_UPDATE_INTERVAL_IN_SECONDS                  = 3;
         static constexpr u64    MAX_UPDATE_INTERVAL_IN_SECONDS                  = 30;
 
-        static constexpr u64    DEFAULT_RESTORE_BLANK_NAMES_ALGORITHM           = 1;
+        static constexpr u64    DEFAULT_RESTORE_BLANK_NAMES_ALGORITHM           = 0;
         static constexpr u64    MAX_RESTORE_BLANK_NAMES_ALGORITHM               = 1;
 
         static constexpr Bool_t DEFAULT_DO_REMOVE_BLANK_NAMES                   = true;
