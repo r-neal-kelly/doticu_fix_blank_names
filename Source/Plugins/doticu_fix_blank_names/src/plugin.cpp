@@ -2,7 +2,6 @@
     Copyright © 2020 r-neal-kelly, aka doticu
 */
 
-#include "doticu_skylib/alias_base.h"
 #include "doticu_skylib/alias_reference.h"
 #include "doticu_skylib/extra_text_display.h"
 #include "doticu_skylib/interface.h"
@@ -14,7 +13,92 @@
 #include "ini.h"
 #include "plugin.h"
 
+//temp
+#include "doticu_skylib/game.h"
+
 namespace doticu_skylib { namespace fix_blank_names {
+
+    static bool keep_going = true;
+
+    static void Test_A()
+    {
+        if (keep_going) {
+            maybe<Actor_t*> actor = static_cast<Actor_t*>(Game_t::Form(0x00019DEA)());
+            if (actor) {
+                actor->Name("Blah!");
+            }
+        }
+    }
+
+    static void Test_B()
+    {
+        maybe<Actor_t*> actor = static_cast<Actor_t*>(Game_t::Form(0x00019DEA)());
+        if (actor) {
+            if (actor->Cell(false) != Player_t::Self()->Cell(false)) {
+                actor->Move_To_Orbit(Player_t::Self(), 0.0f, 0.0f);
+            }
+
+            if (keep_going) {
+                actor->Name("Blah!");
+                Vector_t<some<Alias_Reference_t*>> aliases = actor->Alias_References();
+                for (size_t idx = 1, end = 2; idx < end; idx += 1) {
+                    some<Alias_Reference_t*> alias = aliases[idx];
+
+                    // disabling this prevents the bug. may not be the only source though
+                    alias->alias_base_flags.Is_Flagged(Alias_Base_Flags_e::STORES_NAME, true);
+
+                    class Callback :
+                        public Callback_i<>
+                    {
+                    public:
+                        some<Alias_Reference_t*> alias;
+                        some<Actor_t*> actor;
+
+                    public:
+                        Callback(some<Alias_Reference_t*> alias, some<Actor_t*> actor) :
+                            alias(alias), actor(actor)
+                        {
+                        }
+
+                    public:
+                        virtual void operator ()() override
+                        {
+                            class Callback2 :
+                                public Callback_i<>
+                            {
+                            public:
+                                some<Alias_Reference_t*> alias;
+                                some<Actor_t*> actor;
+
+                            public:
+                                Callback2(some<Alias_Reference_t*> alias, some<Actor_t*> actor) :
+                                    alias(alias), actor(actor)
+                                {
+                                }
+
+                            public:
+                                virtual void operator ()() override
+                                {
+                                    if (String_t(actor->Name()) == String_t("")) {
+                                        keep_going = false;
+                                    }
+                                }
+                            };
+                            alias->Fill(actor, new Callback2(alias, actor));
+                        }
+                    };
+                    alias->Unfill(new Callback(alias, actor()));
+                }
+            }
+        }
+    }
+
+}}
+//
+
+namespace doticu_skylib { namespace fix_blank_names {
+
+    std::unordered_map<Reference_t*, String_t> Plugin_t::store;
 
     Plugin_t::Plugin_t() :
         SKSE_Plugin_t("doticu_fix_blank_names",
@@ -24,21 +108,30 @@ namespace doticu_skylib { namespace fix_blank_names {
                       Operator_e::GREATER_THAN_OR_EQUAL_TO)
     {
         SKYLIB_LOG("doticu_fix_blank_names:");
+
         SKYLIB_LOG("- Update interval has been set to %llu seconds.", ini.update_interval_in_seconds);
-        if (ini.only_prevent_blank_names) {
-            SKYLIB_LOG("- Blank names will only be prevented and never removed.");
+
+        if (ini.restore_blank_names_algorithm == 0) {
+            SKYLIB_LOG("- Using the loose restore algorithm. Restoring all references.");
         } else {
+            SKYLIB_LOG("- Using the strict restore algorithm. Only restoring aliased references with the DO_STORE_NAME flag.");
+        }
+
+        if (ini.do_remove_blank_names) {
             if (ini.only_remove_blank_names_on_load_game) {
                 SKYLIB_LOG("- Blank names will be removed only when a save-game is loaded.");
             } else {
                 SKYLIB_LOG("- Blank names will be removed every update interval.");
             }
-            if (ini.remove_blank_name_algorithm == 0) {
-                SKYLIB_LOG("- Using the loose algorithm. Names with no characters or just whitespace are considered blank.");
+            if (ini.remove_blank_names_algorithm == 0) {
+                SKYLIB_LOG("- Using the loose remove algorithm. Names with no characters or just whitespace are considered blank.");
             } else {
-                SKYLIB_LOG("- Using the strict algorithm. Only names with no characters are considered blank.");
+                SKYLIB_LOG("- Using the strict remove algorithm. Only names with no characters are considered blank.");
             }
+        } else {
+            SKYLIB_LOG("- Unrestorable blank names will not be touched.");
         }
+
         SKYLIB_LOG("");
     }
 
@@ -53,10 +146,12 @@ namespace doticu_skylib { namespace fix_blank_names {
 
     void Plugin_t::On_After_New_Game()
     {
+        store.clear();
     }
 
     void Plugin_t::On_Before_Save_Game()
     {
+        Restore_Names();
     }
 
     void Plugin_t::On_After_Save_Game()
@@ -65,12 +160,13 @@ namespace doticu_skylib { namespace fix_blank_names {
 
     void Plugin_t::On_Before_Load_Game(some<const char*> file_path, u32 file_path_length)
     {
+        store.clear();
     }
 
     void Plugin_t::On_After_Load_Game(Bool_t did_load_successfully)
     {
-        if (ini.only_remove_blank_names_on_load_game) {
-            Remove_All();
+        if (ini.do_remove_blank_names) {
+            Remove_Blanks(std::move(Reference_t::All_References()));
         }
     }
 
@@ -80,135 +176,72 @@ namespace doticu_skylib { namespace fix_blank_names {
 
     void Plugin_t::On_Update(u32 time_stamp)
     {
-        Prevent();
-        if (!ini.only_remove_blank_names_on_load_game) {
-            Remove_Grid();
+        Store_Names();
+        Restore_Names();
+        if (ini.do_remove_blank_names && !ini.only_remove_blank_names_on_load_game) {
+            Remove_Blanks(std::move(Reference_t::Grid_References()));
         }
     }
 
-    static void Test(some<Alias_Reference_t*> alias, some<Reference_t*> reference, some<Extra_Text_Display_t*> x_text_display)
+    void Plugin_t::Store_Names()
     {
-        if (reference->form_id == 0x00019DEA) {
-            reference->Move_To_Orbit(Player_t::Self(), 0.0f, 0.0f);
-
-            x_text_display->Name("Blah!", true);
-            x_text_display->owning_quest = none<Quest_t*>();
-
-            class Callback :
-                public Callback_i<>
-            {
-            public:
-                some<Alias_Reference_t*> alias;
-                some<Reference_t*> reference;
-
-            public:
-                Callback(some<Alias_Reference_t*> alias, some<Reference_t*> reference) :
-                    alias(alias), reference(reference)
-                {
-                }
-
-            public:
-                virtual void operator ()() override
-                {
-                    class Callback2 :
-                        public Callback_i<>
-                    {
-                    public:
-                        some<Alias_Reference_t*> alias;
-                        some<Reference_t*> reference;
-
-                    public:
-                        Callback2(some<Alias_Reference_t*> alias, some<Reference_t*> reference) :
-                            alias(alias), reference(reference)
-                        {
-                        }
-
-                    public:
-                        virtual void operator ()() override
-                        {
-                            if (String_t(reference->Name()) == String_t("")) {
-                                reference->Log_Name_And_Type(SKYLIB_TAB);
-                            }
-                        }
-                    };
-                    alias->Fill(reference, new Callback2(alias, reference));
-                }
-            };
-            alias->Unfill(new Callback(alias, reference));
+        Vector_t<some<Reference_t*>> references = Reference_t::All_References();
+        for (size_t idx = 0, end = references.size(); idx < end; idx += 1) {
+            some<Reference_t*> reference = references[idx];
+            Write_Locker_t locker(reference->x_list.lock);
+            maybe<Extra_Text_Display_t*> x_text_display =
+                reference->x_list.Get<Extra_Text_Display_t>(locker);
+            if (x_text_display && x_text_display->Is_Custom() && x_text_display->name) {
+                /*if (store.count(reference()) < 1) {
+                    SKYLIB_LOG("Storing a name that may potentially be blank in the future:");
+                    reference->Log_Name_And_Type(SKYLIB_TAB);
+                }*/
+                store[reference()] = x_text_display->name;
+            }
         }
     }
 
-    void Plugin_t::Prevent()
+    void Plugin_t::Restore_Names()
     {
-        Vector_t<some<Quest_t*>> quests = Quest_t::Quests_Static();
-        for (size_t idx = 0, end = quests.size(); idx < end; idx += 1) {
-            some<Quest_t*> quest = quests[idx];
-            Write_Locker_t locker(quest->aliases_lock);
-            for (size_t idx = 0, end = quest->aliases.Count(); idx < end; idx += 1) {
-                maybe<Alias_Reference_t*> alias = quest->aliases[idx];
-                if (alias && quest->Has_Filled_Alias(alias->id)) {
-                    class Callback :
-                        public Callback_i<maybe<Reference_t*>>
-                    {
-                    public:
-                        some<Quest_t*> quest;
-                        some<Alias_Reference_t*> alias;
-
-                    public:
-                        Callback(some<Quest_t*> quest, some<Alias_Reference_t*> alias) :
-                            quest(quest), alias(alias)
+        for (auto it = store.begin(); it != store.end(); ++it) {
+            maybe<Reference_t*> reference = it->first;
+            if (reference) {
+                Write_Locker_t locker(reference->x_list.lock);
+                maybe<Extra_Text_Display_t*> x_text_display =
+                    reference->x_list.Get<Extra_Text_Display_t>(locker);
+                if (x_text_display && x_text_display->Is_Custom()) {
+                    if (!x_text_display->name) {
+                        auto Can_Apply_Strict = [](some<Reference_t*> reference, Locker_t& locker)->Bool_t
                         {
-                        }
-
-                    public:
-                        virtual void operator ()(maybe<Reference_t*> reference) override
-                        {
-                            if (reference) {
-                                Write_Locker_t locker(reference->x_list.lock);
-                                maybe<Extra_Text_Display_t*> x_text_display =
-                                    reference->x_list.Get<Extra_Text_Display_t>(locker);
-                                if (x_text_display) {
-                                    if (!x_text_display->owning_quest) {
-                                        x_text_display->owning_quest = this->quest;
-                                        SKYLIB_LOG("Potentially prevented a blank name:");
-                                        reference->Log_Name_And_Type(SKYLIB_TAB);
-                                    }
+                            Vector_t<some<Alias_Reference_t*>> aliases = reference->Alias_References(locker);
+                            for (size_t idx = 0, end = aliases.size(); idx < end; idx += 1) {
+                                if (aliases[idx]->Do_Store_Name()) {
+                                    return true;
                                 }
                             }
+                            return false;
+                        };
+                        if (ini.restore_blank_names_algorithm == 0 || Can_Apply_Strict(reference(), locker)) {
+                            SKYLIB_LOG("Restoring a name that has become blank: %s", it->second);
+                            reference->Log_Name_And_Type(SKYLIB_TAB);
+                            reference->Name(it->second, locker);
                         }
-                    };
-                    alias->To_Reference(new Callback(quest, alias()));
+                    }
+                } else {
+                    store.erase(it);
                 }
             }
         }
     }
 
-    void Plugin_t::Remove_All()
+    void Plugin_t::Remove_Blanks(Vector_t<some<Reference_t*>> references)
     {
-        if (!ini.only_prevent_blank_names) {
-            Bool_t whitespace_counts_as_blank = ini.remove_blank_name_algorithm == 0;
-            Vector_t<some<Reference_t*>> all = Reference_t::All_References();
-            for (size_t idx = 0, end = all.size(); idx < end; idx += 1) {
-                some<Reference_t*> reference = all[idx];
-                if (reference->Remove_Blank_Name(whitespace_counts_as_blank)) {
-                    SKYLIB_LOG("Successfully removed blank name:");
-                    reference->Log_Name_And_Type(SKYLIB_TAB);
-                }
-            }
-        }
-    }
-
-    void Plugin_t::Remove_Grid()
-    {
-        if (!ini.only_prevent_blank_names) {
-            Bool_t whitespace_counts_as_blank = ini.remove_blank_name_algorithm == 0;
-            Vector_t<some<Reference_t*>> grid = Reference_t::Grid_References();
-            for (size_t idx = 0, end = grid.size(); idx < end; idx += 1) {
-                some<Reference_t*> reference = grid[idx];
-                if (reference->Remove_Blank_Name(whitespace_counts_as_blank)) {
-                    SKYLIB_LOG("Successfully removed blank name:");
-                    reference->Log_Name_And_Type(SKYLIB_TAB);
-                }
+        Bool_t whitespace_counts_as_blank = ini.remove_blank_names_algorithm == 0;
+        for (size_t idx = 0, end = references.size(); idx < end; idx += 1) {
+            some<Reference_t*> reference = references[idx];
+            if (reference->Remove_Blank_Name(whitespace_counts_as_blank)) {
+                SKYLIB_LOG("Removed a blank name:");
+                reference->Log_Name_And_Type(SKYLIB_TAB);
             }
         }
     }

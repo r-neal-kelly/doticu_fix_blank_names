@@ -4,6 +4,8 @@
 
 #pragma once
 
+#include <unordered_map>
+
 #include "doticu_skylib/skse_plugin.h"
 
 namespace doticu_skylib { namespace fix_blank_names {
@@ -11,6 +13,9 @@ namespace doticu_skylib { namespace fix_blank_names {
     class Plugin_t :
         public SKSE_Plugin_t
     {
+    public:
+        static std::unordered_map<Reference_t*, String_t> store;
+
     public:
         Plugin_t();
 
@@ -27,9 +32,9 @@ namespace doticu_skylib { namespace fix_blank_names {
         virtual void    On_Update(u32 time_stamp) override;
 
     public:
-        void Prevent();
-        void Remove_All();
-        void Remove_Grid();
+        void Store_Names();
+        void Restore_Names();
+        void Remove_Blanks(Vector_t<some<Reference_t*>> references);
     };
 
     extern Plugin_t plugin;
