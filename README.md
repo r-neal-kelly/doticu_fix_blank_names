@@ -1,5 +1,5 @@
 # Fix Blank Names
-Just a small SKSE plugin that removes blank names from all references around the player every five seconds. No scripts, just plain super-fast C++!
+Just a small SKSE plugin that periodically restores all reference names that have become blank. No scripts, just plain super-fast C++! Comes with a .ini file with a handful of settings.
 
 ### Requirements
 - Skyrim SE 1.5.97

@@ -39,7 +39,6 @@ namespace doticu_skylib { namespace fix_blank_names {
             }
 
             if (keep_going) {
-                actor->Name("Blah!");
                 Vector_t<some<Alias_Reference_t*>> aliases = actor->Alias_References();
                 for (size_t idx = 1, end = 2; idx < end; idx += 1) {
                     some<Alias_Reference_t*> alias = aliases[idx];
@@ -165,8 +164,10 @@ namespace doticu_skylib { namespace fix_blank_names {
 
     void Plugin_t::On_After_Load_Game(Bool_t did_load_successfully)
     {
-        if (ini.do_remove_blank_names) {
-            Remove_Blanks(std::move(Reference_t::All_References()));
+        if (did_load_successfully) {
+            if (ini.do_remove_blank_names) {
+                Remove_Blanks(std::move(Reference_t::All_References()));
+            }
         }
     }
 
@@ -192,10 +193,6 @@ namespace doticu_skylib { namespace fix_blank_names {
             maybe<Extra_Text_Display_t*> x_text_display =
                 reference->x_list.Get<Extra_Text_Display_t>(locker);
             if (x_text_display && x_text_display->Is_Custom() && x_text_display->name) {
-                /*if (store.count(reference()) < 1) {
-                    SKYLIB_LOG("Storing a name that may potentially be blank in the future:");
-                    reference->Log_Name_And_Type(SKYLIB_TAB);
-                }*/
                 store[reference()] = x_text_display->name;
             }
         }
