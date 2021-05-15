@@ -197,9 +197,8 @@ namespace doticu_skylib { namespace fix_blank_names {
         Vector_t<some<Reference_t*>> references = Reference_t::All_References();
         for (size_t idx = 0, end = references.size(); idx < end; idx += 1) {
             some<Reference_t*> reference = references[idx];
-            Write_Locker_t locker(reference->x_list.lock);
             maybe<Extra_Text_Display_t*> x_text_display =
-                reference->x_list.Get<Extra_Text_Display_t>(locker);
+                reference->x_list.Get<Extra_Text_Display_t>();
             if (x_text_display && x_text_display->Is_Custom() && x_text_display->name) {
                 store[reference()] = x_text_display->name;
             }
@@ -211,14 +210,13 @@ namespace doticu_skylib { namespace fix_blank_names {
         for (auto it = store.begin(); it != store.end(); ++it) {
             maybe<Reference_t*> reference = it->first;
             if (reference) {
-                Write_Locker_t locker(reference->x_list.lock);
                 maybe<Extra_Text_Display_t*> x_text_display =
-                    reference->x_list.Get<Extra_Text_Display_t>(locker);
+                    reference->x_list.Get<Extra_Text_Display_t>();
                 if (x_text_display && x_text_display->Is_Custom()) {
                     if (!x_text_display->name) {
-                        auto Can_Apply_Strict = [](some<Reference_t*> reference, Locker_t& locker)->Bool_t
+                        auto Can_Apply_Strict = [](some<Reference_t*> reference)->Bool_t
                         {
-                            Vector_t<some<Alias_Reference_t*>> aliases = reference->Alias_References(locker);
+                            Vector_t<some<Alias_Reference_t*>> aliases = reference->Alias_References();
                             for (size_t idx = 0, end = aliases.size(); idx < end; idx += 1) {
                                 if (aliases[idx]->Do_Store_Name()) {
                                     return true;
@@ -226,10 +224,10 @@ namespace doticu_skylib { namespace fix_blank_names {
                             }
                             return false;
                         };
-                        if (ini.restore_blank_names_algorithm == 0 || Can_Apply_Strict(reference(), locker)) {
+                        if (ini.restore_blank_names_algorithm == 0 || Can_Apply_Strict(reference())) {
                             SKYLIB_LOG("Restoring a name that has become blank: %s", it->second);
                             reference->Log_Name_And_Type(SKYLIB_TAB);
-                            reference->Name(it->second, locker);
+                            reference->Name(it->second);
                         }
                     }
                 } else {
