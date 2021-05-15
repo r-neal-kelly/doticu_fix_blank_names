@@ -92,6 +92,14 @@ namespace doticu_skylib { namespace fix_blank_names {
         }
     }
 
+    static void Test_C()
+    {
+        maybe<Actor_t*> actor = static_cast<Actor_t*>(Game_t::Form(0x00019DEA)());
+        if (actor) {
+            actor->Name("");
+        }
+    }
+
 }}
 //
 
