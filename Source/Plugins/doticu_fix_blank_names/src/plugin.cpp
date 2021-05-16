@@ -4,6 +4,7 @@
 
 #include "doticu_skylib/alias_reference.h"
 #include "doticu_skylib/extra_text_display.h"
+#include "doticu_skylib/game.h"
 #include "doticu_skylib/interface.h"
 #include "doticu_skylib/player.h"
 #include "doticu_skylib/quest.h"
@@ -119,7 +120,7 @@ namespace doticu_skylib { namespace fix_blank_names {
             }
         } iterator;
 
-        Reference_t::Iterate_All_References(iterator);
+        Reference_t::Iterate_All_References_Periodically(iterator);
     }
 
     void Plugin_t::Restore_Names()
