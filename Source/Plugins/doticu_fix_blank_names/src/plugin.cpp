@@ -120,7 +120,7 @@ namespace doticu_skylib { namespace fix_blank_names {
             }
         } iterator;
 
-        Reference_t::Iterate_All_References_Periodically(iterator);
+        Reference_t::Iterate_All_References_Periodically(iterator, std::chrono::nanoseconds(0));
     }
 
     void Plugin_t::Restore_Names()
