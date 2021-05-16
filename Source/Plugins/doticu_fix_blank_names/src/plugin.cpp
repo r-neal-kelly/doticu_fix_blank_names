@@ -205,17 +205,22 @@ namespace doticu_skylib { namespace fix_blank_names {
 
     void Plugin_t::Store_Names()
     {
-        Vector_t<some<Reference_t*>> references = Reference_t::All_References();
-        for (size_t idx = 0, end = references.size(); idx < end; idx += 1) {
-            some<Reference_t*> reference = references[idx];
-_MESSAGE("STORE_NAMES");
-            maybe<Extra_Text_Display_t*> x_text_display =
-                reference->x_list.Get<Extra_Text_Display_t>();
-_MESSAGE("STORE_NAMES: PASSED CRASH");
-            if (x_text_display && x_text_display->Is_Custom() && x_text_display->name) {
-                store[reference()] = x_text_display->name;
+        class Iterator_t :
+            public Iterator_i<some<Reference_t*>>
+        {
+        public:
+            virtual Iterator_e operator ()(some<Reference_t*> reference) override
+            {
+                maybe<Extra_Text_Display_t*> x_text_display =
+                    reference->x_list.Get<Extra_Text_Display_t>();
+                if (x_text_display && x_text_display->Is_Custom() && x_text_display->name) {
+                    store[reference()] = x_text_display->name;
+                }
+                return Iterator_e::CONTINUE;
             }
-        }
+        } iterator;
+
+        Reference_t::Iterate_All_References(iterator);
     }
 
     void Plugin_t::Restore_Names()
@@ -223,10 +228,8 @@ _MESSAGE("STORE_NAMES: PASSED CRASH");
         for (auto it = store.begin(); it != store.end(); ++it) {
             maybe<Reference_t*> reference = it->first;
             if (reference) {
-_MESSAGE("RESTORE_NAMES");
                 maybe<Extra_Text_Display_t*> x_text_display =
                     reference->x_list.Get<Extra_Text_Display_t>();
-_MESSAGE("RESTORE_NAMES: PASSED CRASH");
                 if (x_text_display && x_text_display->Is_Custom()) {
                     if (!x_text_display->name) {
                         auto Can_Apply_Strict = [](some<Reference_t*> reference)->Bool_t
