@@ -15,6 +15,7 @@
 
 //temp
 #include "doticu_skylib/game.h"
+#include "doticu_skylib/math.h"
 
 namespace doticu_skylib { namespace fix_blank_names {
 
@@ -97,6 +98,16 @@ namespace doticu_skylib { namespace fix_blank_names {
         maybe<Actor_t*> actor = static_cast<Actor_t*>(Game_t::Form(0x00019DEA)());
         if (actor) {
             actor->Name("");
+        }
+    }
+
+    static void Test_D(Vector_t<some<Reference_t*>>& references)
+    {
+        if (Math_t::Random_Bool()) {
+            for (size_t idx = 0, end = references.size(); idx < end; idx += 1) {
+                some<Reference_t*> reference = references[idx];
+                reference->Name("");
+            }
         }
     }
 
@@ -197,8 +208,10 @@ namespace doticu_skylib { namespace fix_blank_names {
         Vector_t<some<Reference_t*>> references = Reference_t::All_References();
         for (size_t idx = 0, end = references.size(); idx < end; idx += 1) {
             some<Reference_t*> reference = references[idx];
+_MESSAGE("STORE_NAMES");
             maybe<Extra_Text_Display_t*> x_text_display =
                 reference->x_list.Get<Extra_Text_Display_t>();
+_MESSAGE("STORE_NAMES: PASSED CRASH");
             if (x_text_display && x_text_display->Is_Custom() && x_text_display->name) {
                 store[reference()] = x_text_display->name;
             }
@@ -210,8 +223,10 @@ namespace doticu_skylib { namespace fix_blank_names {
         for (auto it = store.begin(); it != store.end(); ++it) {
             maybe<Reference_t*> reference = it->first;
             if (reference) {
+_MESSAGE("RESTORE_NAMES");
                 maybe<Extra_Text_Display_t*> x_text_display =
                     reference->x_list.Get<Extra_Text_Display_t>();
+_MESSAGE("RESTORE_NAMES: PASSED CRASH");
                 if (x_text_display && x_text_display->Is_Custom()) {
                     if (!x_text_display->name) {
                         auto Can_Apply_Strict = [](some<Reference_t*> reference)->Bool_t
