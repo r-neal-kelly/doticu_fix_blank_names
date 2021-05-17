@@ -125,9 +125,12 @@ namespace doticu_skylib { namespace fix_blank_names {
 
     void Plugin_t::Restore_Names()
     {
-        for (auto it = store.begin(); it != store.end(); ++it) {
+        for (auto it = store.begin(); it != store.end();) {
+            Read_Locker_t locker(Game_t::Form_IDs_To_Forms_Lock());
+
             maybe<Reference_t*> reference = it->first;
-            if (reference) {
+            String_t name = it->second;
+            if (reference && name && Game_t::Has_Form(reference(), locker)) {
                 maybe<Extra_Text_Display_t*> x_text_display =
                     reference->x_list.Get<Extra_Text_Display_t>();
                 if (x_text_display && x_text_display->Is_Custom()) {
@@ -143,14 +146,17 @@ namespace doticu_skylib { namespace fix_blank_names {
                             return false;
                         };
                         if (ini.restore_blank_names_algorithm == 0 || Can_Apply_Strict(reference())) {
-                            SKYLIB_LOG("Restoring a name that has become blank: %s", it->second);
+                            SKYLIB_LOG("Restoring a name that has become blank: %s", name);
                             reference->Log_Name_And_Type(SKYLIB_TAB);
-                            reference->Name(it->second);
+                            reference->Name(name);
                         }
                     }
+                    ++it;
                 } else {
-                    store.erase(it);
+                    it = store.erase(it);
                 }
+            } else {
+                it = store.erase(it);
             }
         }
     }
