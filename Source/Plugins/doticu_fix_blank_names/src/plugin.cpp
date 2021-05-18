@@ -67,7 +67,7 @@ namespace doticu_skylib { namespace fix_blank_names {
         store.clear();
     }
 
-    void Plugin_t::On_Before_Save_Game()
+    void Plugin_t::On_Before_Save_Game(some<const char*> file_path, u32 file_path_length)
     {
         Restore_Names();
     }
