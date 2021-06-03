@@ -67,21 +67,21 @@ namespace doticu_skylib { namespace fix_blank_names {
         store.clear();
     }
 
-    void Plugin_t::On_Before_Save_Game(some<const char*> file_path, u32 file_path_length)
+    void Plugin_t::On_Before_Save_Game(const std::string& file_name)
     {
         Restore_Names();
     }
 
-    void Plugin_t::On_After_Save_Game()
+    void Plugin_t::On_After_Save_Game(const std::string& file_name)
     {
     }
 
-    void Plugin_t::On_Before_Load_Game(some<const char*> file_path, u32 file_path_length)
+    void Plugin_t::On_Before_Load_Game(const std::string& file_name)
     {
         store.clear();
     }
 
-    void Plugin_t::On_After_Load_Game(Bool_t did_load_successfully)
+    void Plugin_t::On_After_Load_Game(const std::string& file_name, Bool_t did_load_successfully)
     {
         if (did_load_successfully) {
             if (ini.do_remove_blank_names) {
@@ -90,7 +90,7 @@ namespace doticu_skylib { namespace fix_blank_names {
         }
     }
 
-    void Plugin_t::On_Before_Delete_Game(some<const char*> file_path, u32 file_path_length)
+    void Plugin_t::On_Before_Delete_Game(const std::string& file_name)
     {
     }
 
